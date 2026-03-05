@@ -1,15 +1,39 @@
-# pi-agents
+# @tintinweb/pi-subagents
 
-A [pi](https://pi.dev) extension that provides Claude Code-style autonomous sub-agents. Spawn specialized agents to handle complex tasks in parallel — each runs in its own isolated session with dedicated tools, system prompts, and model selection.
+A [pi](https://pi.dev) extension that brings **Claude Code-style autonomous sub-agents** to pi. Spawn specialized agents that run in isolated sessions — each with its own tools, system prompt, model, and thinking level. Run them in foreground or background, steer them mid-run, resume completed sessions, and define your own custom agent types.
 
 > **Status:** Early release.
 
-## How It Works
+## Features
 
-The parent agent spawns sub-agents using the `spawn_agent` tool. Each sub-agent runs in an isolated pi session with its own context window, tools, and system prompt. Agents can run in the foreground (blocking) or background (non-blocking with completion notifications).
+- **Claude Code look & feel** — same tool names, calling conventions, and UI patterns (`Agent`, `get_subagent_result`, `steer_subagent`) — feels native
+- **Parallel background agents** — spawn multiple agents that run concurrently with automatic queuing (configurable concurrency limit, default 4)
+- **Live widget UI** — persistent above-editor widget with animated spinners, live tool activity, token counts, and colored status icons
+- **Custom agent types** — define agents in `.pi/agents/<name>.md` with YAML frontmatter: custom system prompts, model selection, thinking levels, tool restrictions
+- **Mid-run steering** — inject messages into running agents to redirect their work without restarting
+- **Session resume** — pick up where an agent left off, preserving full conversation context
+- **Graceful turn limits** — agents get a "wrap up" warning before hard abort, producing clean partial results instead of cut-off output
+- **Fuzzy model selection** — specify models by name (`"haiku"`, `"sonnet"`) instead of full IDs, with automatic filtering to only available/configured models
+- **Context inheritance** — optionally fork the parent conversation into a sub-agent so it knows what's been discussed
+
+## Install
+
+```bash
+pi install npm:@tintinweb/pi-subagents
+```
+
+Or load directly for development:
+
+```bash
+pi -e ./src/index.ts
+```
+
+## Quick Start
+
+The parent agent spawns sub-agents using the `Agent` tool:
 
 ```
-spawn_agent({
+Agent({
   subagent_type: "Explore",
   prompt: "Find all files that handle authentication",
   description: "Find auth files",
@@ -17,64 +41,33 @@ spawn_agent({
 })
 ```
 
+Foreground agents block until complete and return results inline. Background agents return an ID immediately and notify you on completion.
+
 ## UI
 
-The extension renders agent progress in a Claude Code-style UI with an animated spinner and live streaming:
+The extension renders a persistent widget above the editor showing all active agents:
 
-**While running** — animated braille spinner, live activity + token count:
 ```
-⠹ Agent  Find auth files
-⠹ Find auth files · 3 tool uses · 12.4k tokens
-   ⎿  searching, reading 3 files…
-```
-
-**Completed** — green checkmark with final stats:
-```
-✓ Find auth files · 5 tool uses · 33.8k tokens · 12.3s
-   ⎿  Done
+● Agents
+├─ ⠹ Agent  Refactor auth module · 5 tool uses · 33.8k tokens · 12.3s
+│    ⎿  editing 2 files…
+├─ ⠹ Explore  Find auth files · 3 tool uses · 12.4k tokens · 4.1s
+│    ⎿  searching…
+└─ 2 queued
 ```
 
-**Wrapped up** — yellow checkmark when the agent hit its turn limit but finished in time:
-```
-✓ Find auth files · 50 tool uses · 89.1k tokens · 45.2s
-   ⎿  Wrapped up (turn limit)
-```
+Individual agent results render Claude Code-style in the conversation:
 
-**Stopped** — user-initiated abort:
-```
-■ Find auth files · 3 tool uses · 12.4k tokens
-   ⎿  Stopped
-```
+| State | Example |
+|-------|---------|
+| **Running** | `⠹ 3 tool uses · 12.4k tokens` / `⎿ searching, reading 3 files…` |
+| **Completed** | `✓ 5 tool uses · 33.8k tokens · 12.3s` / `⎿ Done` |
+| **Wrapped up** | `✓ 50 tool uses · 89.1k tokens · 45.2s` / `⎿ Wrapped up (turn limit)` |
+| **Stopped** | `■ 3 tool uses · 12.4k tokens` / `⎿ Stopped` |
+| **Error** | `✗ 3 tool uses · 12.4k tokens` / `⎿ Error: timeout` |
+| **Aborted** | `✗ 55 tool uses · 102.3k tokens` / `⎿ Aborted (max turns exceeded)` |
 
-**Background** — immediate return with agent ID:
-```
-⠹ Find auth files
-   ⎿  Running in background (ID: a1b2c3d4e5f6g7h8i)
-```
-
-**Error / Aborted:**
-```
-✗ Find auth files · 3 tool uses · 12.4k tokens
-   ⎿  Error: timeout
-```
-```
-✗ Find auth files · 55 tool uses · 102.3k tokens
-   ⎿  Aborted (max turns exceeded)
-```
-
-Completed results can be expanded (ctrl+o in pi) to show the full agent output inline. The `/agents` command shows a tree of all agents with status, tool uses, and duration.
-
-## Install
-
-```bash
-pi install npm:pi-agents
-```
-
-Or load directly for development:
-
-```bash
-pi -e ~/projects/pi-agents/src/index.ts
-```
+Completed results can be expanded (ctrl+o in pi) to show the full agent output inline.
 
 ## Built-in Agent Types
 
@@ -88,7 +81,7 @@ pi -e ~/projects/pi-agents/src/index.ts
 
 ## Custom Agents
 
-Define custom agent types by creating `.pi/agents/<name>.md` files with YAML frontmatter and a system prompt body. The filename becomes the agent type name.
+Define custom agent types by creating `.pi/agents/<name>.md` files. The filename becomes the agent type name.
 
 ### Example: `.pi/agents/auditor.md`
 
@@ -110,59 +103,52 @@ You are a security auditor. Review code for vulnerabilities including:
 Report findings with file paths, line numbers, severity, and remediation advice.
 ```
 
-This creates an `auditor` agent type that can be spawned like any built-in type:
+Then spawn it like any built-in type:
 
 ```
-spawn_agent({ subagent_type: "auditor", prompt: "Review the auth module", description: "Security audit" })
+Agent({ subagent_type: "auditor", prompt: "Review the auth module", description: "Security audit" })
 ```
 
 ### Frontmatter Fields
 
 All fields are optional — sensible defaults for everything.
 
-| Field | Type | Default (omitted) | Description |
-|-------|------|-------------------|-------------|
-| `description` | string | filename | Agent description shown in tool listings |
-| `tools` | comma-separated | all 7 built-in tools | Built-in tools: read, bash, edit, write, grep, find, ls. Use `none` for no tools |
-| `extensions` | boolean | `true` (inherit) | Inherit MCP/extension tools from parent. `false` or `none` to disable |
-| `skills` | boolean | `true` (inherit) | Inherit skills from parent |
-| `model` | string | inherit parent | Model as `provider/modelId` |
-| `thinking` | string | inherit | Thinking level: off, minimal, low, medium, high, xhigh |
-| `max_turns` | number | 50 | Maximum agentic turns before graceful shutdown |
-| `prompt_mode` | string | `replace` | `replace`: body replaces system prompt. `append`: body appended to default prompt |
-| `inherit_context` | boolean | `false` | Default: fork parent conversation into agent |
-| `run_in_background` | boolean | `false` | Default: run agent in background |
-| `isolated` | boolean | `false` | Default: no extension/MCP tools |
+| Field | Default | Description |
+|-------|---------|-------------|
+| `description` | filename | Agent description shown in tool listings |
+| `tools` | all 7 | Comma-separated built-in tools: read, bash, edit, write, grep, find, ls. `none` for no tools |
+| `extensions` | `true` | Inherit MCP/extension tools. `false` to disable |
+| `skills` | `true` | Inherit skills from parent |
+| `model` | inherit parent | Model as `provider/modelId` |
+| `thinking` | inherit | off, minimal, low, medium, high, xhigh |
+| `max_turns` | 50 | Max agentic turns before graceful shutdown |
+| `prompt_mode` | `replace` | `replace`: body is the full system prompt. `append`: body appended to default prompt |
+| `inherit_context` | `false` | Fork parent conversation into agent |
+| `run_in_background` | `false` | Run in background by default |
+| `isolated` | `false` | No extension/MCP tools, only built-in |
 
-**Convention**: omitted = inherit from parent / use default; `none` or `false` = nothing; value = explicit.
-
-**Spawn-time overrides**: Frontmatter sets defaults. The caller's explicit `spawn_agent` parameters always take precedence (e.g., frontmatter says `run_in_background: true` but caller passes `run_in_background: false` → foreground).
-
-### Prompt Modes
-
-- **`replace`** (default): The markdown body fully replaces the system prompt. You control the entire prompt.
-- **`append`**: The body is appended to the default general-purpose system prompt (environment info, git safety rules, tool usage guidelines). Useful when you want the standard rules plus custom instructions.
+Frontmatter sets defaults. Explicit `Agent` parameters always override them.
 
 ## Tools
 
-### `spawn_agent`
+### `Agent`
 
-Launch a sub-agent. Parameters:
+Launch a sub-agent.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `prompt` | string | yes | The task for the agent |
 | `description` | string | yes | Short 3-5 word summary (shown in UI) |
 | `subagent_type` | string | yes | Agent type (built-in or custom) |
-| `model` | string | no | Model as `provider/modelId` |
+| `model` | string | no | Model — `provider/modelId` or fuzzy name (`"haiku"`, `"sonnet"`) |
 | `thinking` | string | no | Thinking level: off, minimal, low, medium, high, xhigh |
 | `max_turns` | number | no | Max agentic turns (default: 50) |
 | `run_in_background` | boolean | no | Run without blocking |
-| `resume` | string | no | Agent ID to resume |
+| `resume` | string | no | Agent ID to resume a previous session |
 | `isolated` | boolean | no | No extension/MCP tools |
-| `inherit_context` | boolean | no | Fork parent conversation |
+| `inherit_context` | boolean | no | Fork parent conversation into agent |
 
-### `get_agent_result`
+### `get_subagent_result`
 
 Check status and retrieve results from a background agent.
 
@@ -170,64 +156,66 @@ Check status and retrieve results from a background agent.
 |-----------|------|----------|-------------|
 | `agent_id` | string | yes | Agent ID to check |
 | `wait` | boolean | no | Wait for completion |
-| `verbose` | boolean | no | Include full conversation |
+| `verbose` | boolean | no | Include full conversation log |
 
-### `steer_agent`
+### `steer_subagent`
 
-Send a steering message to a running agent. Interrupts after current tool execution.
+Send a steering message to a running agent. The message interrupts after the current tool execution.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `agent_id` | string | yes | Agent ID to steer |
-| `message` | string | yes | Message to inject |
+| `message` | string | yes | Message to inject into agent conversation |
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `/agent <type> <prompt>` | Spawn a sub-agent interactively |
-| `/agents` | List all agents with status |
-
-### Examples
+| `/agents` | List all agents with status tree |
 
 ```
 /agent Explore Find all TypeScript files that handle authentication
 /agent Plan Design a caching layer for the API
-/agent general-purpose Refactor the auth module to use JWT
 /agent auditor Review the payment processing module
 ```
 
 ## Graceful Max Turns
 
-Instead of hard-aborting when an agent reaches its turn limit, pi-agents uses a graceful shutdown:
+Instead of hard-aborting at the turn limit, agents get a graceful shutdown:
 
-1. At `max_turns`, the agent receives a steering message: *"You have reached your turn limit. Wrap up immediately — provide your final answer now."*
-2. The agent gets up to 5 additional grace turns to finish
-3. Only after the grace period does a hard abort occur
+1. At `max_turns` — steering message: *"Wrap up immediately — provide your final answer now."*
+2. Up to 5 grace turns to finish cleanly
+3. Hard abort only after the grace period
 
-This produces three distinct completion states:
-
-| Status | Meaning | UI |
-|--------|---------|-----|
+| Status | Meaning | Icon |
+|--------|---------|------|
 | `completed` | Finished naturally | `✓` green |
-| `steered` | Hit turn limit, wrapped up in grace period | `✓` yellow + "Wrapped up (turn limit)" |
-| `aborted` | Grace period also exceeded, hard-aborted | `✗` red + "Aborted (max turns exceeded)" |
+| `steered` | Hit limit, wrapped up in time | `✓` yellow |
+| `aborted` | Grace period exceeded | `✗` red |
+| `stopped` | User-initiated abort | `■` dim |
 
-User-initiated aborts (via the manager's `abort()` method) produce a separate `stopped` status shown as `■ Stopped`.
+## Concurrency
+
+Background agents are subject to a configurable concurrency limit (default: 4). Excess agents are automatically queued and start as running agents complete. The widget shows queued agents as a collapsed count.
+
+Foreground agents bypass the queue — they block the parent anyway.
 
 ## Architecture
 
 ```
 src/
-  index.ts            # Extension entry: tool/command registration, Claude Code-style rendering
-  types.ts            # Type definitions (SubagentType, AgentRecord, CustomAgentConfig)
+  index.ts            # Extension entry: tool/command registration, rendering
+  types.ts            # Type definitions (SubagentType, AgentRecord, configs)
   agent-types.ts      # Agent type registry (built-in + custom), tool factories
   agent-runner.ts     # Session creation, execution, graceful max_turns, steer/resume
-  agent-manager.ts    # Agent lifecycle, background execution, completion notifications
+  agent-manager.ts    # Agent lifecycle, concurrency queue, completion notifications
   custom-agents.ts    # Load custom agents from .pi/agents/*.md
   prompts.ts          # System prompts per agent type
   context.ts          # Parent conversation context for inherit_context
-  env.ts              # Async environment detection via pi.exec() (git, platform)
+  env.ts              # Environment detection (git, platform)
+  ui/
+    agent-widget.ts   # Persistent widget: spinners, activity, status icons, theming
 ```
 
 ## License
