@@ -1258,7 +1258,34 @@ Guidelines:
     if (idx < 0) return;
     const record = agents[idx];
 
-    await viewAgentConversation(ctx, record);
+    const actions: string[] = ["View conversation"];
+    if (record.status === "running" || record.status === "queued") {
+      actions.push("Stop agent");
+    }
+    actions.push("Back");
+
+    const action = await ctx.ui.select(`${getDisplayName(record.type)} — ${record.status}`, actions);
+    if (!action) {
+      await showRunningAgents(ctx);
+      return;
+    }
+
+    if (action === "Stop agent") {
+      const stopped = manager.abort(record.id);
+      if (stopped) {
+        ctx.ui.notify(`Agent ${record.id} stopped.`, "info");
+        pi.events.emit("subagents:stopped", { id: record.id });
+      } else {
+        ctx.ui.notify(`Failed to stop agent ${record.id}.`, "warning");
+      }
+      await showRunningAgents(ctx);
+      return;
+    }
+
+    if (action === "View conversation") {
+      await viewAgentConversation(ctx, record);
+    }
+
     // Back-navigation: re-show the list
     await showRunningAgents(ctx);
   }
