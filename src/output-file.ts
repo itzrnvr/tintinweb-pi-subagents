@@ -13,7 +13,7 @@ import type { AgentSession, AgentSessionEvent } from "@mariozechner/pi-coding-ag
 /** Create the output file path, ensuring the directory exists.
  *  Mirrors Claude Code's layout: /tmp/{prefix}-{uid}/{encoded-cwd}/{sessionId}/tasks/{agentId}.output */
 export function createOutputFilePath(cwd: string, agentId: string, sessionId: string): string {
-  const encoded = cwd.replace(/\//g, "-").replace(/^-/, "");
+  const encoded = cwd.replace(/[\/\\]/g, "-").replace(/^-/, "");
   const root = join(tmpdir(), `pi-subagents-${process.getuid?.() ?? 0}`);
   mkdirSync(root, { recursive: true, mode: 0o700 });
   chmodSync(root, 0o700);
