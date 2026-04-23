@@ -4,10 +4,12 @@ import * as path from "node:path";
 import * as os from "node:os";
 
 describe("Windows path normalization", () => {
-  it("strips backslashes and drive letters from cwd", () => {
+  it("strips backslashes and drive letters from cwd in the encoded portion", () => {
     const result = createOutputFilePath("C:\\Users\\babys\\project", "agent-123", "session-456");
-    expect(result).not.toContain(":");
-    expect(result).not.toContain("\\");
+    // The encoded cwd portion should have no colons or backslashes
+    const relative = path.relative(os.tmpdir(), result).replace(/\\/g, "/");
+    expect(relative).not.toContain(":");
+    expect(relative).not.toContain("\\");
     expect(result).toContain("agent-123.output");
   });
 
