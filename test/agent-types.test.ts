@@ -5,9 +5,9 @@ import {
   getAvailableTypes,
   getConfig,
   getDefaultAgentNames,
-  getMemoryTools,
-  getReadOnlyMemoryTools,
-  getToolsForType,
+  getMemoryToolNames,
+  getReadOnlyMemoryToolNames,
+  getToolNamesForType,
   getUserAgentNames,
   isValidType,
   registerAgents,
@@ -179,14 +179,14 @@ describe("agent type registry", () => {
       expect(config.skills).toEqual(["planning"]);
     });
 
-    it("getToolsForType works for user agents", () => {
+    it("getToolNamesForType works for user agents", () => {
       const agents = new Map([["auditor", makeAgentConfig({
         name: "auditor",
         builtinToolNames: ["read", "grep", "find"],
       })]]);
       registerAgents(agents);
 
-      const tools = getToolsForType("auditor", "/tmp");
+      const tools = getToolNamesForType("auditor");
       expect(tools).toHaveLength(3);
     });
 
@@ -244,37 +244,34 @@ describe("agent type registry", () => {
     });
   });
 
-  describe("getMemoryTools", () => {
+  describe("getMemoryToolNames", () => {
     it("returns read, write, edit when none exist", () => {
-      const tools = getMemoryTools("/tmp", new Set());
-      const names = tools.map(t => t.name);
-      expect(names).toContain("read");
-      expect(names).toContain("write");
-      expect(names).toContain("edit");
-      expect(names).toHaveLength(3);
+      const tools = getMemoryToolNames(new Set());
+      expect(tools).toContain("read");
+      expect(tools).toContain("write");
+      expect(tools).toContain("edit");
+      expect(tools).toHaveLength(3);
     });
 
     it("skips tools that already exist", () => {
-      const tools = getMemoryTools("/tmp", new Set(["read", "edit"]));
-      const names = tools.map(t => t.name);
-      expect(names).toEqual(["write"]);
+      const tools = getMemoryToolNames(new Set(["read", "edit"]));
+      expect(tools).toEqual(["write"]);
     });
 
     it("returns empty when all memory tools already exist", () => {
-      const tools = getMemoryTools("/tmp", new Set(["read", "write", "edit"]));
+      const tools = getMemoryToolNames(new Set(["read", "write", "edit"]));
       expect(tools).toHaveLength(0);
     });
   });
 
-  describe("getReadOnlyMemoryTools", () => {
+  describe("getReadOnlyMemoryToolNames", () => {
     it("returns only read when missing", () => {
-      const tools = getReadOnlyMemoryTools("/tmp", new Set());
-      const names = tools.map(t => t.name);
-      expect(names).toEqual(["read"]);
+      const tools = getReadOnlyMemoryToolNames(new Set());
+      expect(tools).toEqual(["read"]);
     });
 
     it("returns empty when read already exists", () => {
-      const tools = getReadOnlyMemoryTools("/tmp", new Set(["read"]));
+      const tools = getReadOnlyMemoryToolNames(new Set(["read"]));
       expect(tools).toHaveLength(0);
     });
   });

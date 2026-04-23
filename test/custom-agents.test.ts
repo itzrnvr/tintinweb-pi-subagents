@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BUILTIN_TOOL_NAMES } from "../src/agent-types.js";
 import { loadCustomAgents } from "../src/custom-agents.js";
 
@@ -13,11 +13,13 @@ describe("loadCustomAgents", () => {
     tmpDir = mkdtempSync(join(tmpdir(), "pi-test-"));
     originalHome = process.env.HOME;
     process.env.HOME = tmpDir;
+    process.env.USERPROFILE = tmpDir;
   });
 
   afterEach(() => {
     if (originalHome == null) delete process.env.HOME;
     else process.env.HOME = originalHome;
+    delete process.env.USERPROFILE;
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
