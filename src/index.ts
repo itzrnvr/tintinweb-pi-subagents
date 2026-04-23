@@ -17,7 +17,7 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@m
 import { Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
 import { AgentManager } from "./agent-manager.js";
-import { getAgentConversation, getDefaultMaxTurns, getGraceTurns, normalizeMaxTurns, setDefaultMaxTurns, setGraceTurns, steerAgent } from "./agent-runner.js";
+import { getAgentConversation, getDefaultMaxTurns, getGraceTurns, normalizeMaxTurns, setDefaultMaxTurns, setGraceTurns, steerAgent, swapAgentModel } from "./agent-runner.js";
 import { BUILTIN_TOOL_NAMES, getAgentConfig, getAllTypes, getAvailableTypes, getDefaultAgentNames, getUserAgentNames, registerAgents, resolveType } from "./agent-types.js";
 import { registerRpcHandlers } from "./cross-extension-rpc.js";
 import { loadCustomAgents } from "./custom-agents.js";
@@ -1260,6 +1260,7 @@ Guidelines:
 
     const actions: string[] = ["View conversation"];
     if (record.status === "running" || record.status === "queued") {
+      actions.push("Swap model");
       actions.push("Stop agent");
     }
     actions.push("Back");
@@ -1277,6 +1278,20 @@ Guidelines:
         pi.events.emit("subagents:stopped", { id: record.id });
       } else {
         ctx.ui.notify(`Failed to stop agent ${record.id}.`, "warning");
+      }
+      await showRunningAgents(ctx);
+      return;
+    }
+
+    if (action === "Swap model") {
+      if (!record.session) {
+        ctx.ui.notify("Session not ready yet — try again in a moment.", "warning");
+      } else {
+        const modelInput = await ctx.ui.input("New model", "provider/modelId or fuzzy name");
+        if (modelInput) {
+          const msg = await swapAgentModel(record.session, modelInput, ctx.modelRegistry);
+          ctx.ui.notify(msg, msg.startsWith("Model swapped") ? "info" : "warning");
+        }
       }
       await showRunningAgents(ctx);
       return;

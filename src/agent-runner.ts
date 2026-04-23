@@ -15,6 +15,7 @@ import {
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { getAgentConfig, getConfig, getMemoryToolNames, getReadOnlyMemoryToolNames, getToolNamesForType } from "./agent-types.js";
+import { resolveModel } from "./model-resolver.js";
 import { buildParentContext, extractText } from "./context.js";
 import { detectEnv } from "./env.js";
 import { buildMemoryBlock, buildReadOnlyMemoryBlock } from "./memory.js";
@@ -410,6 +411,24 @@ export async function steerAgent(
   message: string,
 ): Promise<void> {
   await session.steer(message);
+}
+
+/**
+ * Swap the model of a running subagent session.
+ * The new model takes effect on the agent's next LLM turn.
+ */
+export async function swapAgentModel(
+  session: AgentSession,
+  modelInput: string,
+  registry: any,
+): Promise<string> {
+  const resolved = resolveModel(modelInput, registry);
+  if (typeof resolved === "string") {
+    return resolved; // error message
+  }
+  await session.setModel(resolved);
+  const m = resolved as any;
+  return `Model swapped to ${m.provider}/${m.id}${m.name ? ` (${m.name})` : ""}.`;
 }
 
 /**
