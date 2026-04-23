@@ -252,7 +252,11 @@ export class AgentManager {
   ): Promise<AgentRecord> {
     const id = this.spawn(pi, ctx, type, prompt, { ...options, isBackground: false });
     const record = this.agents.get(id)!;
-    await record.promise;
+    try {
+      await record.promise;
+    } catch {
+      // promise rejection handled in chain — record already has status/error set
+    }
     return record;
   }
 
@@ -311,6 +315,7 @@ export class AgentManager {
       this.queue = this.queue.filter(q => q.id !== id);
       record.status = "stopped";
       record.completedAt = Date.now();
+      record.result ??= "Agent was stopped by user before it started.";
       return true;
     }
 
@@ -318,6 +323,7 @@ export class AgentManager {
     record.abortController?.abort();
     record.status = "stopped";
     record.completedAt = Date.now();
+    record.result ??= "Agent was stopped by user.";
     return true;
   }
 
