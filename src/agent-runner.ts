@@ -14,7 +14,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import { getAgentConfig, getConfig, getMemoryTools, getReadOnlyMemoryTools, getToolsForType } from "./agent-types.js";
+import { getAgentConfig, getConfig, getMemoryToolNames, getReadOnlyMemoryToolNames, getToolNamesForType } from "./agent-types.js";
 import { buildParentContext, extractText } from "./context.js";
 import { detectEnv } from "./env.js";
 import { buildMemoryBlock, buildReadOnlyMemoryBlock } from "./memory.js";
@@ -184,25 +184,25 @@ export async function runAgent(
     }
   }
 
-  let tools = getToolsForType(type, effectiveCwd);
+  let tools = getToolNamesForType(type);
 
   // Persistent memory: detect write capability and branch accordingly.
   // Account for disallowedTools — a tool in the base set but on the denylist is not truly available.
   if (agentConfig?.memory) {
-    const existingNames = new Set(tools.map(t => t.name));
+    const existingNames = new Set(tools);
     const denied = agentConfig.disallowedTools ? new Set(agentConfig.disallowedTools) : undefined;
     const effectivelyHas = (name: string) => existingNames.has(name) && !denied?.has(name);
     const hasWriteTools = effectivelyHas("write") || effectivelyHas("edit");
 
     if (hasWriteTools) {
       // Read-write memory: add any missing memory tools (read/write/edit)
-      const memTools = getMemoryTools(effectiveCwd, existingNames);
+      const memTools = getMemoryToolNames(existingNames);
       if (memTools.length > 0) tools = [...tools, ...memTools];
       extras.memoryBlock = buildMemoryBlock(agentConfig.name, agentConfig.memory, effectiveCwd);
     } else {
       // Read-only memory: only add read tool, use read-only prompt
       if (!existingNames.has("read")) {
-        const readTools = getReadOnlyMemoryTools(effectiveCwd, existingNames);
+        const readTools = getReadOnlyMemoryToolNames(existingNames);
         if (readTools.length > 0) tools = [...tools, ...readTools];
       }
       extras.memoryBlock = buildReadOnlyMemoryBlock(agentConfig.name, agentConfig.memory, effectiveCwd);
@@ -280,7 +280,7 @@ export async function runAgent(
   // Filter active tools: remove our own tools to prevent nesting,
   // apply extension allowlist if specified, and apply disallowedTools denylist
   if (extensions !== false) {
-    const builtinToolNames = new Set(tools.map(t => t.name));
+    const builtinToolNames = new Set(tools);
     const activeTools = session.getActiveToolNames().filter((t) => {
       if (EXCLUDED_TOOL_NAMES.includes(t)) return false;
       if (disallowedSet?.has(t)) return false;
