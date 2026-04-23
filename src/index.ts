@@ -1260,6 +1260,7 @@ Guidelines:
 
     const actions: string[] = ["View conversation"];
     if (record.status === "running" || record.status === "queued") {
+      actions.push("Steer (send message)");
       actions.push("Swap model");
       actions.push("Stop agent");
     }
@@ -1278,6 +1279,24 @@ Guidelines:
         pi.events.emit("subagents:stopped", { id: record.id });
       } else {
         ctx.ui.notify(`Failed to stop agent ${record.id}.`, "warning");
+      }
+      await showRunningAgents(ctx);
+      return;
+    }
+
+    if (action === "Steer (send message)") {
+      if (!record.session) {
+        ctx.ui.notify("Session not ready yet — try again in a moment.", "warning");
+      } else {
+        const steerMsg = await ctx.ui.input("Steer message", "Redirect the agent...");
+        if (steerMsg) {
+          try {
+            await steerAgent(record.session, steerMsg);
+            ctx.ui.notify(`Steer sent to agent ${record.id}.`, "info");
+          } catch (err) {
+            ctx.ui.notify(`Failed to steer: ${err instanceof Error ? err.message : String(err)}`, "warning");
+          }
+        }
       }
       await showRunningAgents(ctx);
       return;
