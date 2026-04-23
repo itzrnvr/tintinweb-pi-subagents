@@ -880,15 +880,20 @@ Guidelines:
       let spinnerFrame = 0;
       const startedAt = Date.now();
       let fgId: string | undefined;
+      let lastUpdate = 0;
+      const UPDATE_THROTTLE_MS = 250;
 
-      const streamUpdate = () => {
+      const streamUpdate = (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastUpdate < UPDATE_THROTTLE_MS) return;
+        lastUpdate = now;
         const details: AgentDetails = {
           ...detailBase,
           toolUses: fgState.toolUses,
           tokens: fgState.tokens,
           turnCount: fgState.turnCount,
           maxTurns: fgState.maxTurns,
-          durationMs: Date.now() - startedAt,
+          durationMs: now - startedAt,
           status: "running",
           activity: describeActivity(fgState.activeTools, fgState.responseText),
           spinnerFrame: spinnerFrame % SPINNER.length,
@@ -899,7 +904,7 @@ Guidelines:
         });
       };
 
-      const { state: fgState, callbacks: fgCallbacks } = createActivityTracker(effectiveMaxTurns, streamUpdate);
+      const { state: fgState, callbacks: fgCallbacks } = createActivityTracker(effectiveMaxTurns, () => streamUpdate(false));
 
       // Wire session creation to register in widget
       const origOnSession = fgCallbacks.onSessionCreated;
@@ -915,11 +920,11 @@ Guidelines:
         }
       };
 
-      // Animate spinner at ~80ms (smooth rotation through 10 braille frames)
+      // Animate spinner at ~250ms (throttled to avoid TUI event loop flooding)
       const spinnerInterval = setInterval(() => {
         spinnerFrame++;
-        streamUpdate();
-      }, 80);
+        streamUpdate(false);
+      }, 250);
 
       streamUpdate();
 
