@@ -1082,6 +1082,35 @@ Guidelines:
     },
   });
 
+  // ---- stop_subagent tool ----
+
+  pi.registerTool({
+    name: "stop_subagent",
+    label: "Stop Agent",
+    description:
+      "Stop a running agent immediately. This aborts the agent's session and marks it as stopped.",
+    parameters: Type.Object({
+      agent_id: Type.String({
+        description: "The agent ID to stop (must be currently running).",
+      }),
+    }),
+    execute: async (_toolCallId, params, _signal, _onUpdate, _ctx) => {
+      const record = manager.getRecord(params.agent_id);
+      if (!record) {
+        return textResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
+      }
+      if (record.status !== "running" && record.status !== "queued") {
+        return textResult(`Agent "${params.agent_id}" is not running (status: ${record.status}).`);
+      }
+      const stopped = manager.abort(params.agent_id);
+      if (stopped) {
+        pi.events.emit("subagents:stopped", { id: record.id });
+        return textResult(`Agent ${record.id} stopped.`);
+      }
+      return textResult(`Failed to stop agent ${record.id}.`);
+    },
+  });
+
   // ---- /agents interactive menu ----
 
   const projectAgentsDir = () => join(process.cwd(), ".pi", "agents");
